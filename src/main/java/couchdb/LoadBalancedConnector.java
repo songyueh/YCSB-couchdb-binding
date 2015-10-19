@@ -36,25 +36,25 @@ import org.ektorp.impl.StdCouchDbInstance;
 /*
  * This CouchDbConnector load balances the request to
  * the different nodes in the couchdb cluster.
- * 
- * Note: Only the create, get, update and delete methods are implemented. 
- * 
+ *
+ * Note: Only the create, get, update and delete methods are implemented.
+ *
  * ***********************************************************************
- * 
+ *
  * Copyright 2013 KU Leuven Research and Development - iMinds - Distrinet
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * Administrative Contact: dnet-project-office@cs.kuleuven.be
  * Technical Contact: arnaud.schoonjans@student.kuleuven.be
  */
@@ -62,7 +62,7 @@ public class LoadBalancedConnector implements CouchDbConnector{
 
 	private final List<CouchDbConnector> connectors;
 	private int nextConnector;
-	
+
 	public LoadBalancedConnector(List<URL> urlsOfNodesInCluster, String databaseName){
 		if(urlsOfNodesInCluster == null)
 			throw new IllegalArgumentException("urlsOfNodesInClusterIsNull");
@@ -83,11 +83,23 @@ public class LoadBalancedConnector implements CouchDbConnector{
 		}
 		return result;
 	}
-	
+
+	private List<CouchDbConnector> createConnectors(List<URL> urlsForConnectors, String databaseName, String user, String password){
+		List<CouchDbConnector> result = new ArrayList<CouchDbConnector>();
+		for(URL url : urlsForConnectors){
+			HttpClient httpClient = new StdHttpClient.Builder().url(url).username(user).password(password).build();
+			CouchDbInstance dbInstance = new StdCouchDbInstance(httpClient);
+			// 2nd paramter true => Create database if not exists
+			CouchDbConnector dbConnector = dbInstance.createConnector(databaseName, true);
+			result.add(dbConnector);
+		}
+		return result;
+	}
+
 	private void updateNextConnector(){
 		this.nextConnector = (this.nextConnector+1) % this.connectors.size();
 	}
-	
+
 	private CouchDbConnector getConnector(){
 		CouchDbConnector result = this.connectors.get(this.nextConnector);
 		this.updateNextConnector();
@@ -97,7 +109,7 @@ public class LoadBalancedConnector implements CouchDbConnector{
 	private CouchDbConnector getConnectorForMutationOperations(){
 		return this.connectors.get(0);
 	}
-	
+
 	@Override
 	public void create(String id, Object o) {
 		boolean failed = true;
@@ -492,7 +504,7 @@ public class LoadBalancedConnector implements CouchDbConnector{
 		boolean failed = true;
 		for(int i=0; i<this.connectors.size() && failed; i++){
 			try{
-				this.getConnectorForMutationOperations().update(id, document, length, options); 
+				this.getConnectorForMutationOperations().update(id, document, length, options);
 				failed = false;
 			} catch(UpdateConflictException exc){
 				throw exc;

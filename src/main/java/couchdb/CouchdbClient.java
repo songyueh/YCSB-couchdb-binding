@@ -27,24 +27,24 @@ import couchdb.StringToStringMap;
 
 /*
  * Copyright 2013 KU Leuven Research and Development - iMinds - Distrinet
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * 
+ *
  * Administrative Contact: dnet-project-office@cs.kuleuven.be
  * Technical Contact: arnaud.schoonjans@student.kuleuven.be
  */
 public class CouchdbClient extends DB{
-	
+
 	// Default configuration
 	private static final String DEFAULT_DATABASE_NAME = "usertable";
 	private static final int DEFAULT_COUCHDB_PORT_NUMBER = 5984;
@@ -56,7 +56,7 @@ public class CouchdbClient extends DB{
 	private static final int UPDATE_CONFLICT = -2;
 	private static final int DOC_NOT_FOUND = -3;
 	private static final int JSON_PARSING_FAULT = -4;
-	
+
 	public CouchdbClient(){
 		this.dbConnector = null;
 	}
@@ -65,9 +65,9 @@ public class CouchdbClient extends DB{
 	public CouchdbClient(List<URL> urls){
 		if(urls == null)
 			throw new IllegalArgumentException("urls is null");
-		this.dbConnector = new LoadBalancedConnector(urls, DEFAULT_DATABASE_NAME);
+			this.dbConnector = new LoadBalancedConnector(urls, DEFAULT_DATABASE_NAME);
 	}
-	
+
 	private List<URL> getUrlsForHosts() throws DBException{
 		List<URL> result = new ArrayList<URL>();
 		String hosts = getProperties().getProperty("hosts");
@@ -78,14 +78,13 @@ public class CouchdbClient extends DB{
 		}
 		return result;
 	}
-	
+
 	private URL getUrlForHost(String host) throws DBException{
 		String[] hostAndPort = host.split(":");
 		try{
 			if(hostAndPort.length == 1){
 				return new URL(PROTOCOL, host, DEFAULT_COUCHDB_PORT_NUMBER, "");
-			} 
-			else{
+			}else{
 				int portNumber = Integer.parseInt(hostAndPort[1]);
 				return new URL(PROTOCOL, hostAndPort[0], portNumber, "");
 			}
@@ -95,18 +94,25 @@ public class CouchdbClient extends DB{
 			throw new DBException("Invalid port number specified");
 		}
 	}
-	
+
 	@Override
 	public void init() throws DBException{
 		List<URL> urls = getUrlsForHosts();
-		this.dbConnector = new LoadBalancedConnector(urls, DEFAULT_DATABASE_NAME);
+		boolean authNeeded = Boolean.parseBoolean(getProperties().getProperty("auth", "false"));
+		if (authNeeded) {
+			String user = getProperties().getProperty("user", "");
+			String password = getProperties().getProperty("password", "");
+			this.dbConnector = new LoadBalancedConnector(urls, DEFAULT_DATABASE_NAME, user, password);
+		}else{
+			this.dbConnector = new LoadBalancedConnector(urls, DEFAULT_DATABASE_NAME);
+		}
 	}
-	
+
 	@Override
 	public void cleanup() throws DBException {
 		// Do nothing
 	}
-	
+
 	private StringToStringMap executeReadOperation(String key){
 		try{
 			return this.dbConnector.get(StringToStringMap.class, key);
@@ -114,7 +120,7 @@ public class CouchdbClient extends DB{
 			return null;
 		}
 	}
-	
+
 	private int executeWriteOperation(String key, StringToStringMap dataToWrite){
 		try{
 			dataToWrite.put("_id", key);
@@ -124,7 +130,7 @@ public class CouchdbClient extends DB{
 		}
 		return OK;
 	}
-	
+
 	private int executeDeleteOperation(StringToStringMap dataToDelete){
 		try{
 			this.dbConnector.delete(dataToDelete);
@@ -133,7 +139,7 @@ public class CouchdbClient extends DB{
 		}
 		return OK;
 	}
-	
+
 	private int executeUpdateOperation(StringToStringMap dataToUpdate){
 		try{
 			this.dbConnector.update(dataToUpdate);
@@ -142,7 +148,7 @@ public class CouchdbClient extends DB{
 		}
 		return OK;
 	}
-	
+
 	private void copyRequestedFieldsToResultMap(Set<String> fields,
 			StringToStringMap inputMap,
 			HashMap<String, ByteIterator> result){
@@ -155,7 +161,7 @@ public class CouchdbClient extends DB{
 		result.put("_id",  _id);
 		result.put("_rev", _rev);
 	}
-	
+
 	private void copyAllFieldsToResultMap(StringToStringMap inputMap,
 			HashMap<String, ByteIterator> result){
 		for(String field: inputMap.keySet()){
@@ -163,7 +169,7 @@ public class CouchdbClient extends DB{
 			result.put(field, value);
 		}
 	}
-	
+
 	// Table variable is not used => already contained in database connector
 	@Override
 	public int read(String table, String key, Set<String> fields,
@@ -178,7 +184,7 @@ public class CouchdbClient extends DB{
 		}
 		return OK;
 	}
-	
+
 	@Override
 	public int scan(String table, String startkey, int recordcount,
 			Set<String> fields, Vector<HashMap<String, ByteIterator>> result) {
@@ -197,7 +203,7 @@ public class CouchdbClient extends DB{
 		}
 		return OK;
 	}
-	
+
 	private ViewResult executeView(String startKey, int amountOfRecords){
 		ViewQuery query = new ViewQuery()
 	      .viewName("_all_docs")
@@ -206,7 +212,7 @@ public class CouchdbClient extends DB{
 	      .includeDocs(true);
 		return this.dbConnector.queryView(query);
 	}
-	
+
 	private JSONObject parseAsJsonObject(String stringToParse){
 		JSONParser parser = new JSONParser();
 		try {
@@ -216,7 +222,7 @@ public class CouchdbClient extends DB{
 			return null;
 		}
 	}
-	
+
 	private HashMap<String, ByteIterator> getFieldsFromJsonObj(Set<String> fields, JSONObject jsonObj){
 		HashMap<String, ByteIterator> result = new HashMap<String, ByteIterator>();
 		for(String key: fields){
@@ -225,7 +231,7 @@ public class CouchdbClient extends DB{
 		}
 		return result;
 	}
-	
+
 	// Table variable is not used => already contained in database connector
 	@Override
 	public int update(String table, String key,
@@ -237,7 +243,7 @@ public class CouchdbClient extends DB{
 		return this.executeUpdateOperation(updatedMap);
 	}
 
-	private StringToStringMap updateFields(StringToStringMap toUpdate, 
+	private StringToStringMap updateFields(StringToStringMap toUpdate,
 							HashMap<String, ByteIterator> newValues){
 		for(String updateField: newValues.keySet()){
 			ByteIterator newValue = newValues.get(updateField);
@@ -245,7 +251,7 @@ public class CouchdbClient extends DB{
 		}
 		return toUpdate;
 	}
-	
+
 	// Table variable is not used => already contained in database connector
 	@Override
 	public int insert(String table, String key,
@@ -262,5 +268,5 @@ public class CouchdbClient extends DB{
 			return DOC_NOT_FOUND;
 		return this.executeDeleteOperation(toDelete);
 	}
-	
+
 }
