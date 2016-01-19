@@ -71,7 +71,16 @@ public class LoadBalancedConnector implements CouchDbConnector{
 		this.connectors = this.createConnectors(urlsOfNodesInCluster, databaseName);
 		this.nextConnector = 0;
 	}
-	
+
+	public LoadBalancedConnector(List<URL> urlsOfNodesInCluster, String databaseName, String user, String password){
+		if(urlsOfNodesInCluster == null)
+			throw new IllegalArgumentException("urlsOfNodesInClusterIsNull");
+		if(urlsOfNodesInCluster.isEmpty())
+			throw new IllegalArgumentException("At least one node required");
+		this.connectors = this.createConnectors(urlsOfNodesInCluster, databaseName, user, password);
+		this.nextConnector = 0;
+	}
+
 	private List<CouchDbConnector> createConnectors(List<URL> urlsForConnectors, String databaseName){
 		List<CouchDbConnector> result = new ArrayList<CouchDbConnector>();
 		for(URL url : urlsForConnectors){
